@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "prompt-injection-detector"
+version = "0.0.0"
+description = "Reproducible training and evaluation pipeline for a prompt-injection classifier."
+requires-python = ">=3.11"
+dependencies = ["numpy", "scikit-learn", "matplotlib", "pyyaml"]
+
+[project.optional-dependencies]
+hf = ["datasets"]
+finetune = ["datasets", "torch", "transformers", "accelerate"]
+
+[dependency-groups]
+dev = ["pytest", "ruff"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pid"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+ignore = ["E501"]  # comprimento de linha não é verificado
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu124", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+]

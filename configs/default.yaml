@@ -1,0 +1,23 @@
+# Conferir nomes de colunas, rótulos e licenças no cartão de cada dataset antes de rodar.
+seed: 42
+target_recall: 0.95   # recall alvo na validação, usado para escolher o limiar
+
+primary:              # treino, validação e teste "na mesma base"
+  name: xtram1
+  source: hf          # hf | local
+  hf_id: xTRam1/safe-guard-prompt-injection
+  split: train
+  text_col: text
+  label_col: label
+  positive_label: 1   # 1 = injection (confira no cartão do dataset)
+  license: "não especificada no cartão (conferir antes de redistribuir)"
+
+external:             # teste em OUTRA base (mede mudança de distribuição)
+  name: deepset
+  source: hf
+  hf_id: deepset/prompt-injections
+  split: train
+  text_col: text
+  label_col: label
+  positive_label: 1
+  license: "Apache-2.0 (conferir no cartão)"

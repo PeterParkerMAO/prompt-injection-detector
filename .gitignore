@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+outputs/
+data/
+*.joblib
+.DS_Store
+.idea/
+PASSO_A_PASSO.md
+reports/errors_*.csv
+reports/hp_*.json
+reports/smoke_*.json
