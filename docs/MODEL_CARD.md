@@ -88,4 +88,5 @@ CPU latency (single text): p50 `63.3` ms, p95 `169.9` ms. Size: `267.8` MB.
 - **Synthetic training data overstates real-world performance:** Near-perfect in-distribution F1 (`0.954–0.969`) does not transfer automatically to human-authored or multilingual attacks without target-domain threshold recalibration.
 
 ## Citation / contact
-Repository: `https://github.com/PeterParkerMAO/prompt-injection-detector`
+- GitHub Repository: `https://github.com/PeterParkerMAO/prompt-injection-detector`
+- Hugging Face Hub: `https://huggingface.co/RelyD/prompt-injection-detector`

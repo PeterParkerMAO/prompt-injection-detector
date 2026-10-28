@@ -1,4 +1,4 @@
-# prompt-injection-detector
+1# prompt-injection-detector
 
 > **Status: evaluated on real public datasets (`data_source: "real"`).** Every number in this
 > README comes directly from `reports/metrics.json` (`xTRam1/safe-guard-prompt-injection` →
@@ -77,7 +77,7 @@ uv run python -m pid.finetune --model protectai/deberta-v3-base-prompt-injection
 
 ![Post-Error-Analysis Mitigations: Sentence Max-Pooling and Few-Shot Recalibration](reports/figures/mitigation_recalibration_and_windowing.png)
 
-Method, limitations and decisions: [`docs/DECISOES.md`](docs/DECISOES.md). Model card: [`docs/MODEL_CARD.md`](docs/MODEL_CARD.md).
+Method, limitations and decisions: [`docs/DECISOES.md`](docs/DECISOES.md). Model card: [`docs/MODEL_CARD.md`](docs/MODEL_CARD.md) (published on Hugging Face Hub: [`RelyD/prompt-injection-detector`](https://huggingface.co/RelyD/prompt-injection-detector)).
 
 ## Data and licenses
 
