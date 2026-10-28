@@ -28,8 +28,20 @@ hold up on another?*
 uv sync
 uv run pytest -q                     # unit tests (synthetic data, no network)
 uv run python -m pid.cli --synthetic # end-to-end demo; numbers are NOT results
+
+# 1. Real run: rules, word TF-IDF + LR, char-wb TF-IDF + LR, and calibrated LinearSVC
 uv sync --extra hf
-uv run python -m pid.cli --config configs/default.yaml   # real run
+uv run python -m pid.cli --config configs/default.yaml --extra-baselines
+
+# 2. Fine-tuning transformers (GPU recommended) and evaluating public off-the-shelf detector
+uv sync --extra hf --extra finetune
+for s in 42 43 44; do
+  uv run python -m pid.finetune --model distilbert-base-uncased --epochs 3 --lr 2e-5 --seed $s
+  uv run python -m pid.finetune --model distilbert-base-multilingual-cased --epochs 3 --lr 2e-5 --seed $s
+done
+uv run python -m pid.finetune --model sentence-transformers/all-MiniLM-L6-v2 --epochs 3 --lr 2e-5 --seed 42
+uv run python -m pid.finetune --model microsoft/deberta-v3-small --epochs 3 --lr 2e-5 --batch-size 16 --seed 42
+uv run python -m pid.finetune --model protectai/deberta-v3-base-prompt-injection-v2 --eval-only
 ```
 
 ## Results (from `reports/metrics.json`, `target_recall = 0.95` on validation)
@@ -70,11 +82,12 @@ Check each dataset card for its license before publishing anything derived from 
 
 ## Limitations
 
-1. **Severe distribution shift & threshold miscalibration:** Because `xTRam1/safe-guard-prompt-injection` attacks were synthetically generated with GPT-3.5-turbo in English, both `tfidf_lr` (ROC-AUC `0.999`) and fine-tuned DistilBERT (ROC-AUC `1.000`) achieve near-perfect separation in-distribution. Calibrating the threshold on validation for `target_recall = 0.95` pushes the threshold to `0.480` for TF-IDF and `0.998–0.999` for DistilBERT (due to neural network overconfidence). On `deepset/prompt-injections`, out-of-distribution scores fall below these high thresholds, causing external F1 to drop from `0.954` to `0.129` (TF-IDF) and from `0.968` to `0.039–0.085` (DistilBERT), even though ranking ability remains moderate (`ROC-AUC = 0.755` for TF-IDF and `0.721` for DistilBERT).
-2. **Stacked / indirect prompt injections:** Long benign prefixes dilute document-level representations (L2-normalized TF-IDF vectors and truncated 128-token windows), allowing trailing instructions like *"Forget everything"* to slip through as false negatives.
-3. **Language coverage:** `xTRam1` is English-only, whereas `deepset` includes attacks in German, Spanish, French, Russian, and Croatian. Using `distilbert-base-multilingual-cased` improved average external F1 across the 3 seeds from `0.054` to `0.079`, but cross-lingual transfer without multilingual training examples remains limited.
-4. **Small external test set:** With `n = 546` (`203` positives) in `deepset`, 95% bootstrap confidence intervals on external F1 span ~`0.10–0.12` points (vs. ~`0.025–0.030` in-distribution).
-5. **Label noise in public benchmarks:** Manual inspection of `xTRam1` errors revealed benign creative-writing prompts and explicit non-jailbreak texts labeled as `1`.
+1. **Severe distribution shift & threshold miscalibration:** Because `xTRam1/safe-guard-prompt-injection` attacks were synthetically generated with GPT-3.5-turbo in English, both `tfidf_lr` (ROC-AUC `0.999`) and fine-tuned DistilBERT (ROC-AUC `1.000`) achieve near-perfect separation in-distribution. Calibrating the threshold on validation for `target_recall = 0.95` pushes the threshold to `0.480` for TF-IDF and `0.998–0.999` for DistilBERT (due to neural network overconfidence). On `deepset/prompt-injections`, out-of-distribution scores fall below these high thresholds, causing external F1 to drop from `0.954` to `0.129` (TF-IDF) and from `0.957–0.969` to `0.039–0.085` (DistilBERT), even though ranking ability remains moderate (`ROC-AUC = 0.755` for word TF-IDF, `0.832` for `char_wb_tfidf_lr`, `0.667–0.721` across the 3 seeds of `distilbert-base-uncased`, and `0.612–0.654` across the 3 seeds of `distilbert-base-multilingual-cased`).
+2. **Model selection criterion shift & server memory budget (512 MiB pod → 100–150 MB model cap, CPU p95 ≤ 50 ms):** Under the initial strict criterion ("highest external F1 at the validation-calibrated threshold within ≤ 50 ms and ≤ 150 MB"), regex **`rules` (`F1 = 0.308`, `p95 = 0.28 ms`)** wins because every model trained on `xTRam1` suffers from threshold miscalibration on `deepset`. After observing that fixed-threshold F1 conflates ranking ability with synthetic threshold calibration, we recorded an explicit criterion shift in [`docs/DECISOES.md`](docs/DECISOES.md): evaluating by **external ROC-AUC + target-domain threshold recalibration** within the 100–150 MB / 50 ms pod budget selects **`char_wb_tfidf_lr` (`ROC-AUC = 0.832`, `2.06 MB`, `p95 = 5.11 ms`)**.
+3. **Training-source overlap in the third-party baseline (`protectai/deberta-v3-base-prompt-injection-v2`):** Its model card lists **7 training datasets**, including `VMware/open-instruct` and `jackhhao/jailbreak-classification`, which are also upstream sources of `xTRam1`. Therefore, its "same-base" score on `xTRam1` (`F1 = 0.947`) is not an independent evaluation. Because `deepset/prompt-injections` is not among its 7 training datasets, its external score (`F1 = 0.756`, `ROC-AUC = 0.879`) is a valid out-of-distribution reference, though its footprint (`737.7 MB`, `p95 = 826.1 ms`) exceeds the 512 MiB pod budget.
+4. **Stacked / indirect prompt injections:** Long benign prefixes dilute document-level representations (L2-normalized TF-IDF vectors and truncated 128-token windows), allowing trailing instructions like *"Forget everything"* to slip through as false negatives.
+5. **Language coverage & small external test set:** `xTRam1` is English-only, whereas `deepset` (`n = 546`, `203` positives) includes German, Spanish, French, Russian, and Croatian prompts, yielding wide 95% bootstrap confidence intervals (~`0.10–0.14` F1 width on `deepset` vs. ~`0.03` on `xTRam1`).
+6. **Label noise in public benchmarks:** Manual inspection of `xTRam1` errors revealed benign creative-writing prompts and explicit non-jailbreak texts labeled as `1`.
 
 ## AI assistance
 
