@@ -11,7 +11,7 @@ dependencies = ["numpy", "scikit-learn", "matplotlib", "pyyaml"]
 
 [project.optional-dependencies]
 hf = ["datasets"]
-finetune = ["datasets", "torch", "transformers", "accelerate"]
+finetune = ["datasets", "torch", "transformers", "accelerate", "sentencepiece", "tiktoken", "protobuf"]
 
 [dependency-groups]
 dev = ["pytest", "ruff"]
@@ -37,5 +37,5 @@ explicit = true
 
 [tool.uv.sources]
 torch = [
-  { index = "pytorch-cu124", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+  { index = "pytorch-cu124", marker = "sys_platform == 'win32'" },
 ]
