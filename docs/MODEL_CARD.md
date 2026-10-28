@@ -70,9 +70,12 @@ CPU latency (single text): p50 `63.3` ms, p95 `169.9` ms. Size: `267.8` MB.
 | --- | --- | --- | --- | --- | --- |
 | `rules` (`thr = 0.500`) | 0.359 | 0.308 | 0.609 / 0.591 | 0.03 / **0.28** | — |
 | `tfidf_lr` (`thr = 0.480`) | 0.954 (0.939–0.969) | 0.129 (0.070–0.194) | 0.999 / 0.755 | 0.33 / 0.62 | 5.58 |
-| `char_wb_tfidf_lr` (`thr = 0.452`) | 0.963 (0.948–0.976) | 0.112 (0.058–0.174) | 0.999 / **0.832** | 1.11 / 5.11 | **2.06** |
+| `char_wb_tfidf_lr` (`thr = 0.452`) | 0.963 (0.948–0.976) | 0.112 (0.058–0.174) | 0.999 / 0.832 | 1.11 / 5.11 | **2.06** |
+| `char_wb_tfidf_lr_windowed` (`thr = 0.452`) | 0.962 (0.947–0.975) | 0.145 (0.086–0.210)* | 0.997 / **0.882** | 1.34 / 10.74 | **2.06** |
 | `word_char_svm` (`thr = 0.941`) | 0.965 (0.951–0.977) | 0.075 (0.029–0.127) | 1.000 / 0.795 | 3.47 / 6.33 | 4.58 |
-| `pretrained:protectai/deberta-v3-base-prompt-injection-v2` (`thr = 0.0002`) | 0.947 (0.929–0.962) | **0.756** (0.703–0.807) | 0.995 / **0.879** | 525.5 / 826.1 | 737.7 |
+| `pretrained:protectai/deberta-v3-base-prompt-injection-v2` (`thr = 0.0002`) | 0.947 (0.929–0.962) | **0.756** (0.703–0.807) | 0.995 / 0.879 | 525.5 / 826.1 | 737.7 |
+
+*\*Recalibrating only the threshold on `n = 30` target-domain samples (evaluated out-of-sample on the remaining 516 rows) raises external F1 to `0.672` (`char_wb_tfidf_lr`) and `0.729` (`char_wb_tfidf_lr_windowed`).*
 
 ## Limitations and risks
 - **What the model misses (from error analysis):**

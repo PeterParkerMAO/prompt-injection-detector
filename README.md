@@ -50,7 +50,8 @@ uv run python -m pid.finetune --model protectai/deberta-v3-base-prompt-injection
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
 | `rules` (Regex) | 0.5000 | 0.359 (—) | 0.308 (—) | 0.609 / 0.591 | **0.28** | — |
 | `tfidf_lr` (Word 1–2) | 0.4798 | 0.954 (0.939–0.969) | 0.129 (0.070–0.194) | 0.999 / 0.755 | 0.62 | 5.58 |
-| `char_wb_tfidf_lr` (Char 3–5) | 0.4516 | 0.963 (0.948–0.976) | 0.112 (0.058–0.174) | 0.999 / **0.832** | 5.11 | **2.06** |
+| `char_wb_tfidf_lr` (Char 3–5) | 0.4516 | 0.963 (0.948–0.976) | 0.112 (0.058–0.174) | 0.999 / 0.832 | 5.11 | **2.06** |
+| `char_wb_tfidf_lr_windowed` (Sentence Max-Pool) | 0.4516 | 0.962 (0.947–0.975) | 0.145 (0.086–0.210)* | 0.997 / **0.882** | 10.74 | **2.06** |
 | `word_char_svm` (LinearSVC cal.) | 0.9415 | 0.965 (0.951–0.977) | 0.075 (0.029–0.127) | 1.000 / 0.795 | 6.33 | 4.58 |
 | `finetune:all-MiniLM-L6-v2` (`seed 42`) | 0.9951 | 0.968 (0.954–0.979) | 0.155 (0.091–0.219) | 1.000 / 0.657 | 145.45 | 90.9 |
 | `finetune:distilbert-base-uncased` (`seed 42`) | 0.9988 | 0.968 (0.954–0.980) | 0.067 (0.021–0.119) | **1.000** / 0.704 | 169.86 | 267.8 |
@@ -60,7 +61,9 @@ uv run python -m pid.finetune --model protectai/deberta-v3-base-prompt-injection
 | `finetune:distilbert-base-multilingual-cased` (`seed 43`) | 0.9982 | **0.969** (0.955–0.981) | 0.085 (0.038–0.139) | 1.000 / 0.645 | 248.32 | 541.3 |
 | `finetune:distilbert-base-multilingual-cased` (`seed 44`) | 0.9982 | 0.966 (0.953–0.978) | 0.076 (0.030–0.129) | 1.000 / 0.612 | 192.99 | 541.3 |
 | `finetune:microsoft/deberta-v3-small` (`seed 42`) | 0.9999 | 0.968 (0.955–0.979) | **0.188** (0.117–0.260) | **1.000** / 0.823 | 496.92 | 567.6 |
-| `pretrained:protectai/deberta-v3-base-prompt-injection-v2` *(off-the-shelf)* | 0.0002 | 0.947 (0.929–0.962) | **0.756** (0.703–0.807) | 0.995 / **0.879** | 826.07 | 737.7 |
+| `pretrained:protectai/deberta-v3-base-prompt-injection-v2` *(off-the-shelf)* | 0.0002 | 0.947 (0.929–0.962) | **0.756** (0.703–0.807) | 0.995 / 0.879 | 826.07 | 737.7 |
+
+*\*With 30-sample few-shot threshold recalibration on the target domain (evaluated out-of-sample on the remaining 516 external rows), `char_wb_tfidf_lr` reaches external **F1 = 0.672** and `char_wb_tfidf_lr_windowed` reaches **F1 = 0.729** (`95% CI: 0.597–0.766`, recall `0.754`, precision `0.732`) without retraining any weights.*
 
 ### Benchmark Visualizations
 
@@ -71,6 +74,8 @@ uv run python -m pid.finetune --model protectai/deberta-v3-base-prompt-injection
 ![CPU Latency p95 vs External Generalization](reports/figures/benchmark_latency_pareto.png)
 
 ![Score Distribution Shift on Positive Samples](reports/figures/score_distribution_shift.png)
+
+![Post-Error-Analysis Mitigations: Sentence Max-Pooling and Few-Shot Recalibration](reports/figures/mitigation_recalibration_and_windowing.png)
 
 Method, limitations and decisions: [`docs/DECISOES.md`](docs/DECISOES.md). Model card: [`docs/MODEL_CARD.md`](docs/MODEL_CARD.md).
 
