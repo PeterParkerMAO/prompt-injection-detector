@@ -52,6 +52,32 @@ def tfidf_scores(model: Pipeline, texts: list[str]) -> np.ndarray:
     return model.predict_proba(texts)[:, 1]
 
 
+_SENT_SPLIT = re.compile(r"(?<=[.!?;\n])\s+|\n+")
+
+
+def split_text_windows(text: str, min_chars: int = 12) -> list[str]:
+    """Retorna o texto completo e suas sentenças individuais para evitar diluição em stacked prompts."""
+    parts = [p.strip() for p in _SENT_SPLIT.split(text) if len(p.strip()) >= min_chars]
+    if len(parts) <= 1:
+        return [text]
+    return [text, *parts]
+
+
+def windowed_tfidf_scores(model: Pipeline, texts: list[str], min_chars: int = 12) -> np.ndarray:
+    """Pontua cada documento pelo máximo entre o texto completo e suas sentenças (max-pooling)."""
+    if not texts:
+        return np.array([], dtype=float)
+    flat_chunks: list[str] = []
+    spans: list[tuple[int, int]] = []
+    for t in texts:
+        chunks = split_text_windows(t, min_chars=min_chars)
+        start = len(flat_chunks)
+        flat_chunks.extend(chunks)
+        spans.append((start, len(flat_chunks)))
+    all_probs = model.predict_proba(flat_chunks)[:, 1]
+    return np.array([float(np.max(all_probs[s:e])) for s, e in spans], dtype=float)
+
+
 def train_char_tfidf_lr(texts: list[str], labels: list[int], seed: int = 42, C: float = 1.0,
                         min_df: int = 2) -> Pipeline:
     model = Pipeline([

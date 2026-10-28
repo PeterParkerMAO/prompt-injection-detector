@@ -101,3 +101,36 @@ def measure_latency(predict_one: Callable[[str], object], texts: list[str], repe
         times.append((time.perf_counter() - start) * 1000)
     return {"p50_ms": float(np.percentile(times, 50)), "p95_ms": float(np.percentile(times, 95)),
             "n": len(times)}
+
+
+def recalibrate_few_shot(y_true, scores, n_calib: int = 30, target_recall: float = 0.85,
+                         n_trials: int = 100, seed: int = 42) -> dict:
+    """Recalibra o limiar com n_calib amostras do domínio-alvo e avalia no restante (sem vazamento)."""
+    y = np.asarray(y_true)
+    s = np.asarray(scores, dtype=float)
+    if len(y) <= n_calib:
+        raise ValueError("n_calib deve ser menor que o total de exemplos")
+    rng = np.random.default_rng(seed)
+    f1s, recalls, precs, fprs, thrs = [], [], [], [], []
+    for _ in range(n_trials):
+        perm = rng.permutation(len(y))
+        cal_idx, eval_idx = perm[:n_calib], perm[n_calib:]
+        if int((y[cal_idx] == 1).sum()) == 0 or len(set(y[eval_idx].tolist())) < 2:
+            continue
+        thr = threshold_for_recall(y[cal_idx], s[cal_idx], target_recall)
+        res = evaluate_at_threshold(y[eval_idx], s[eval_idx], thr)
+        thrs.append(thr)
+        f1s.append(res["f1"])
+        recalls.append(res["recall"])
+        precs.append(res["precision"])
+        fprs.append(res["fpr"])
+    return {
+        "n_calib": n_calib,
+        "target_recall": target_recall,
+        "mean_threshold": float(np.mean(thrs)),
+        "mean_f1": float(np.mean(f1s)),
+        "ci95_f1": [float(np.quantile(f1s, 0.025)), float(np.quantile(f1s, 0.975))],
+        "mean_recall": float(np.mean(recalls)),
+        "mean_precision": float(np.mean(precs)),
+        "mean_fpr": float(np.mean(fprs)),
+    }

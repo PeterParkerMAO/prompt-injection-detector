@@ -56,3 +56,18 @@ def test_error_files_are_written_for_manual_reading(pipeline_run):
     for name in ("errors_tfidf_in_distribution.csv", "errors_tfidf_external.csv"):
         header = (out / name).read_text(encoding="utf-8").splitlines()[0]
         assert header == "set,type,label,score,text"
+
+
+def test_extra_baselines_adds_models_and_benchmark_charts(tmp_path):
+    old = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        out = tmp_path / "reports_extra"
+        metrics = cli.run(None, synthetic=True, out_dir=str(out), extra_baselines=True)
+    finally:
+        os.chdir(old)
+    names = {m["name"] for m in metrics["models"]}
+    assert {"rules", "tfidf_lr", "char_wb_tfidf_lr", "word_char_svm"} <= names
+    for art_key in ("benchmark_f1", "benchmark_roc_auc", "benchmark_latency_pareto"):
+        assert art_key in metrics["artifacts"]
+        assert (out / metrics["artifacts"][art_key]).exists()
