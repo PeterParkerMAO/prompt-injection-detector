@@ -126,10 +126,34 @@ def run(config: dict | None, synthetic: bool, out_dir: str, extra_baselines: boo
                 "external_ci95": {
                     "f1": list(evaluate.bootstrap_ci(labels(external), bext, bthr, "f1", seed=seed)),
                 },
+                "external_recalibrated_n30": evaluate.recalibrate_few_shot(
+                    labels(external), bext, n_calib=30, target_recall=0.80, seed=seed),
                 "latency_ms_cpu": evaluate.measure_latency(
                     lambda t, m=bmodel: baselines.tfidf_scores(m, [t]), texts(test)),
             }
             report.add_model(metrics, b_entry)
+            if bname == "char_wb_tfidf_lr":
+                wtest = baselines.windowed_tfidf_scores(bmodel, texts(test))
+                wext = baselines.windowed_tfidf_scores(bmodel, texts(external))
+                w_entry = {
+                    "name": "char_wb_tfidf_lr_windowed",
+                    "size_mb": b_entry["size_mb"],
+                    "threshold": bthr,
+                    "in_distribution": _score_block(labels(test), wtest, bthr),
+                    "in_distribution_ci95": {
+                        "f1": list(evaluate.bootstrap_ci(labels(test), wtest, bthr, "f1", seed=seed)),
+                        "roc_auc": list(evaluate.bootstrap_ci(labels(test), wtest, bthr, "roc_auc", seed=seed)),
+                    },
+                    "external": _score_block(labels(external), wext, bthr),
+                    "external_ci95": {
+                        "f1": list(evaluate.bootstrap_ci(labels(external), wext, bthr, "f1", seed=seed)),
+                    },
+                    "external_recalibrated_n30": evaluate.recalibrate_few_shot(
+                        labels(external), wext, n_calib=30, target_recall=0.80, seed=seed),
+                    "latency_ms_cpu": evaluate.measure_latency(
+                        lambda t, m=bmodel: baselines.windowed_tfidf_scores(m, [t]), texts(test)),
+                }
+                report.add_model(metrics, w_entry)
 
     # --- erros para leitura manual (não versionar) ---
     report.write_errors(out / "errors_tfidf_in_distribution.csv", test, test_scores, thr, "in_distribution")
