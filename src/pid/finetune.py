@@ -29,7 +29,7 @@ def _softmax_positive(logits: np.ndarray) -> np.ndarray:
 
 def run(config_path: str, model_name: str, epochs: int, lr: float, batch_size: int,
         max_length: int, max_samples: int | None, seed: int | None, out_dir: str,
-        metrics_path: str) -> dict:
+        metrics_path: str, eval_only: bool = False) -> dict:
     import torch
     from torch.utils.data import Dataset
     from transformers import (
@@ -87,8 +87,9 @@ def run(config_path: str, model_name: str, epochs: int, lr: float, batch_size: i
         fp16=torch.cuda.is_available() and not is_deberta,
         logging_steps=50,
     )
-    trainer = Trainer(model=model, args=args, train_dataset=Encoded(train))
-    trainer.train()
+    trainer = Trainer(model=model, args=args, train_dataset=None if eval_only else Encoded(train))
+    if not eval_only:
+        trainer.train()
 
     def scores(rows):
         logits = trainer.predict(Encoded(rows)).predictions
@@ -112,12 +113,11 @@ def run(config_path: str, model_name: str, epochs: int, lr: float, batch_size: i
             return model(**enc).logits
 
     size_mb = sum(p.numel() * p.element_size() for p in model.parameters()) / 1e6
+    entry_name = f"pretrained:{model_name}" if eval_only else f"finetune:{model_name}:seed{seed}"
     entry = {
-        "name": f"finetune:{model_name}:seed{seed}",
+        "name": entry_name,
         "size_mb": round(size_mb, 1),
         "threshold": thr,
-        "hyperparameters": {"epochs": epochs, "lr": lr, "batch_size": batch_size,
-                            "max_length": max_length, "max_samples": max_samples},
         "in_distribution": in_dist,
         "in_distribution_ci95": {
             "f1": list(evaluate.bootstrap_ci(y_test, test_scores, thr, "f1", seed=seed)),
@@ -127,11 +127,13 @@ def run(config_path: str, model_name: str, epochs: int, lr: float, batch_size: i
         "external_ci95": {"f1": list(evaluate.bootstrap_ci(y_ext, ext_scores, thr, "f1", seed=seed))},
         "latency_ms_cpu": evaluate.measure_latency(predict_one, [s.text for s in test], repeats=100),
     }
-
-    out = Path(out_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    model.save_pretrained(out / "model")
-    tok.save_pretrained(out / "model")
+    if not eval_only:
+        entry["hyperparameters"] = {"epochs": epochs, "lr": lr, "batch_size": batch_size,
+                                    "max_length": max_length, "max_samples": max_samples}
+        out = Path(out_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        model.save_pretrained(out / "model")
+        tok.save_pretrained(out / "model")
 
     mpath = Path(metrics_path)
     metrics = None
@@ -143,11 +145,13 @@ def run(config_path: str, model_name: str, epochs: int, lr: float, batch_size: i
     report.add_model(metrics, entry)
     fig_dir = mpath.parent / "figures"
     fig_dir.mkdir(parents=True, exist_ok=True)
-    tag = f"finetune_seed{seed}"
-    report.plot_confusion(in_dist["confusion"], fig_dir / f"{tag}_confusion_in_distribution.png",
-                          f"{model_name}, mesma base")
-    report.plot_confusion(ext["confusion"], fig_dir / f"{tag}_confusion_external.png",
-                          f"{model_name}, outra base")
+    if not eval_only:
+        tag = f"finetune_seed{seed}"
+        report.plot_confusion(in_dist["confusion"], fig_dir / f"{tag}_confusion_in_distribution.png",
+                              f"{model_name}, mesma base")
+        report.plot_confusion(ext["confusion"], fig_dir / f"{tag}_confusion_external.png",
+                              f"{model_name}, outra base")
+    metrics.setdefault("artifacts", {}).update(report.plot_benchmark_summary(metrics, fig_dir))
     report.write_metrics(mpath, metrics)
     return entry
 
@@ -162,11 +166,12 @@ def main() -> None:
     p.add_argument("--max-length", type=int, default=128)
     p.add_argument("--max-samples", type=int, default=None, help="teste de fumaça com poucas amostras")
     p.add_argument("--seed", type=int, default=None)
+    p.add_argument("--eval-only", action="store_true", help="avalia detector pré-treinado sem treinar")
     p.add_argument("--out", default="outputs/finetune")
     p.add_argument("--metrics", default="reports/metrics.json")
     a = p.parse_args()
     entry = run(a.config, a.model, a.epochs, a.lr, a.batch_size, a.max_length, a.max_samples,
-                a.seed, a.out, a.metrics)
+                a.seed, a.out, a.metrics, eval_only=a.eval_only)
     print(f"{entry['name']}: mesma base F1={entry['in_distribution']['f1']:.3f}, "
           f"outra base F1={entry['external']['f1']:.3f}, p95={entry['latency_ms_cpu']['p95_ms']:.1f} ms")
 

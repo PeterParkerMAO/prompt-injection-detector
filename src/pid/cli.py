@@ -22,7 +22,7 @@ def _score_block(y, scores, threshold):
     return evaluate.evaluate_at_threshold(y, scores, threshold)
 
 
-def run(config: dict | None, synthetic: bool, out_dir: str) -> dict:
+def run(config: dict | None, synthetic: bool, out_dir: str, extra_baselines: bool = False) -> dict:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     seed = (config or {}).get("seed", 42)
@@ -103,6 +103,34 @@ def run(config: dict | None, synthetic: bool, out_dir: str) -> dict:
     }
     report.add_model(metrics, entry)
 
+    if extra_baselines:
+        for bname, trainer_fn in (
+            ("char_wb_tfidf_lr", baselines.train_char_tfidf_lr),
+            ("word_char_svm", baselines.train_word_char_svm),
+        ):
+            bmodel = trainer_fn(texts(train), labels(train), seed=seed)
+            bval = baselines.tfidf_scores(bmodel, texts(val))
+            bthr = evaluate.threshold_for_recall(labels(val), bval, target_recall)
+            btest = baselines.tfidf_scores(bmodel, texts(test))
+            bext = baselines.tfidf_scores(bmodel, texts(external))
+            b_entry = {
+                "name": bname,
+                "size_mb": round(len(pickle.dumps(bmodel)) / 1e6, 3),
+                "threshold": bthr,
+                "in_distribution": _score_block(labels(test), btest, bthr),
+                "in_distribution_ci95": {
+                    "f1": list(evaluate.bootstrap_ci(labels(test), btest, bthr, "f1", seed=seed)),
+                    "roc_auc": list(evaluate.bootstrap_ci(labels(test), btest, bthr, "roc_auc", seed=seed)),
+                },
+                "external": _score_block(labels(external), bext, bthr),
+                "external_ci95": {
+                    "f1": list(evaluate.bootstrap_ci(labels(external), bext, bthr, "f1", seed=seed)),
+                },
+                "latency_ms_cpu": evaluate.measure_latency(
+                    lambda t, m=bmodel: baselines.tfidf_scores(m, [t]), texts(test)),
+            }
+            report.add_model(metrics, b_entry)
+
     # --- erros para leitura manual (não versionar) ---
     report.write_errors(out / "errors_tfidf_in_distribution.csv", test, test_scores, thr, "in_distribution")
     report.write_errors(out / "errors_tfidf_external.csv", external, ext_scores, thr, "external")
@@ -125,6 +153,8 @@ def run(config: dict | None, synthetic: bool, out_dir: str) -> dict:
         "roc": "figures/tfidf_roc.png",
         "pr": "figures/tfidf_pr.png",
     }
+    if extra_baselines:
+        metrics["artifacts"].update(report.plot_benchmark_summary(metrics, fig_dir))
     report.write_metrics(out / "metrics.json", metrics)
     return metrics
 
@@ -133,10 +163,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Treina e avalia os baselines de prompt injection.")
     parser.add_argument("--config", default="configs/default.yaml")
     parser.add_argument("--synthetic", action="store_true", help="usa dados sintéticos (só teste do pipeline)")
+    parser.add_argument("--extra-baselines", action="store_true",
+                        help="treina também char_wb_tfidf_lr e word_char_svm e gera gráficos comparativos")
     parser.add_argument("--out", default="reports")
     args = parser.parse_args()
     cfg = None if args.synthetic else yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
-    result = run(cfg, args.synthetic, args.out)
+    result = run(cfg, args.synthetic, args.out, extra_baselines=args.extra_baselines)
     for m in result["models"]:
         print(f"{m['name']:>9}  mesma base F1={m['in_distribution']['f1']:.3f}  "
               f"outra base F1={m['external']['f1']:.3f}  p95={m['latency_ms_cpu']['p95_ms']:.2f} ms")
