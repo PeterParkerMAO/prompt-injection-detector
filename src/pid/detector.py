@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import threading
 import warnings
@@ -11,6 +12,9 @@ from typing import Any
 
 import joblib
 import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
 
 from . import baselines
 
@@ -81,34 +85,116 @@ class PromptInjectionDetector:
     @classmethod
     def load(
         cls,
-        path: str | Path,
-        threshold: float = DEFAULT_THRESHOLD,
+        path: str | Path | None = None,
+        threshold: float | None = None,
         scoring: str = "hybrid",
     ) -> PromptInjectionDetector:
-        """Carrega o modelo serializado a partir do caminho informado.
+        """Carrega o detector de prompt injection.
 
-        Emite aviso de segurança explícito sobre os riscos de desserialização com joblib/pickle.
+        Por padrão, carrega os pesos em formato seguro JSON (outputs/hybrid_stacked_char_lr.json).
+        Se um caminho de artefato .joblib for informado, emite aviso explícito de que o joblib
+        é um artefato de pesquisa e pode executar código arbitrário (pickle RCE).
         """
-        p = Path(path)
+        if path is None:
+            json_default = Path("outputs/hybrid_stacked_char_lr.json")
+            if json_default.is_file():
+                p = json_default
+            else:
+                p = Path("outputs/hybrid_stacked_char_lr.joblib")
+        else:
+            p = Path(path)
+
         if not p.is_file():
             raise FileNotFoundError(f"Arquivo de artefato não encontrado: {p}")
 
+        if p.suffix.lower() == ".json":
+            return cls._load_json(p, threshold=threshold, scoring=scoring)
+        return cls._load_joblib(p, threshold=threshold, scoring=scoring)
+
+    @classmethod
+    def _load_json(
+        cls,
+        path: Path,
+        threshold: float | None = None,
+        scoring: str = "hybrid",
+    ) -> PromptInjectionDetector:
+        """Carrega os pesos a partir de JSON de forma segura sem deserialização executável."""
+        data_bytes = path.read_bytes()
+        model_version = hashlib.sha256(data_bytes).hexdigest()[:12]
+        data = json.loads(data_bytes.decode("utf-8"))
+
+        ex_params = data.get("extraction_params", {})
+        analyzer = ex_params.get("analyzer", "char_wb")
+        ngram_range = tuple(ex_params.get("ngram_range", [3, 5]))
+        lowercase = bool(ex_params.get("lowercase", True))
+        sublinear_tf = bool(ex_params.get("sublinear_tf", True))
+        norm = ex_params.get("norm", "l2")
+
+        vec = TfidfVectorizer(
+            analyzer=analyzer,
+            ngram_range=ngram_range,
+            lowercase=lowercase,
+            sublinear_tf=sublinear_tf,
+            norm=norm,
+        )
+        vec.vocabulary_ = data["vocabulary"]
+        vec.fixed_vocabulary_ = True
+        idf_arr = np.asarray(data["idf"], dtype=np.float64)
+        vec.idf_ = idf_arr
+        vec._tfidf.idf_ = idf_arr
+
+        clf = LogisticRegression()
+        clf.coef_ = np.asarray([data["coef"]], dtype=np.float64)
+        clf.intercept_ = np.asarray(data["intercept"], dtype=np.float64)
+        clf.classes_ = np.asarray(data.get("classes", [0, 1]), dtype=int)
+
+        pipeline = Pipeline([("tfidf", vec), ("clf", clf)])
+
+        chosen_threshold = (
+            float(threshold)
+            if threshold is not None
+            else float(data.get("threshold", DEFAULT_THRESHOLD))
+        )
+
+        return cls(
+            model=pipeline,
+            model_version=model_version,
+            threshold=chosen_threshold,
+            scoring=scoring,
+        )
+
+    @classmethod
+    def _load_joblib(
+        cls,
+        path: Path,
+        threshold: float | None = None,
+        scoring: str = "hybrid",
+    ) -> PromptInjectionDetector:
+        """Carrega artefato joblib legado para reprodução/pesquisa com aviso de segurança."""
         warnings.warn(
-            "Security warning: Loading artifacts with joblib (pickle) can execute arbitrary code. "
-            "Only load model artifacts from trusted sources.",
+            "Research artifact warning: Loading artifacts with joblib (pickle) is intended only for "
+            "research/reproducibility and can execute arbitrary code. Only load model artifacts from trusted sources.",
             UserWarning,
-            stacklevel=2,
+            stacklevel=3,
         )
         logger.warning(
-            "Loading joblib artifact from %s. Ensure the artifact source is trusted.",
-            p.name,
+            "Loading joblib research artifact from %s. Ensure the artifact source is trusted.",
+            path.name,
         )
 
-        data_bytes = p.read_bytes()
+        data_bytes = path.read_bytes()
         model_version = hashlib.sha256(data_bytes).hexdigest()[:12]
-        model = joblib.load(p)
+        model = joblib.load(path)
+        chosen_threshold = (
+            float(threshold) if threshold is not None else DEFAULT_THRESHOLD
+        )
 
-        return cls(model=model, model_version=model_version, threshold=threshold, scoring=scoring)
+        return cls(
+            model=model,
+            model_version=model_version,
+            threshold=chosen_threshold,
+            scoring=scoring,
+        )
 
     @classmethod
     def validate_input(cls, text: Any) -> None:

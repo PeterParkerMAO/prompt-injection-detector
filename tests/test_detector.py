@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import concurrent.futures
+import json
 import logging
+import warnings
 from pathlib import Path
 
 import joblib
@@ -161,3 +163,51 @@ def test_thread_safety_under_concurrent_calls(tiny_model_path: Path) -> None:
     # Garante que respostas para a mesma pergunta são idênticas mesmo sob concorrência
     baking_results = [r for q, r in zip(queries, results) if "bake bread" in q]
     assert len(set(baking_results)) == 1
+
+
+@pytest.fixture
+def tiny_json_model_path(tmp_path: Path) -> Path:
+    """Cria um artefato JSON mínimo em disco para testes de carga segura sem pickle."""
+    data = {
+        "schema_version": "1.0.0",
+        "model_name": "hybrid_stacked_char_lr",
+        "threshold": 0.65,
+        "source_joblib_hash": "dummy_source_hash_12345",
+        "commit_hash": "dummy_commit_67890",
+        "extraction_params": {
+            "analyzer": "char_wb",
+            "ngram_range": [3, 4],
+            "lowercase": True,
+            "sublinear_tf": True,
+            "norm": "l2",
+            "janelas": {"min_chars": 12, "aggregation": "max"},
+        },
+        "classes": [0, 1],
+        "intercept": [-0.5],
+        "coef": [1.2, -0.8, 0.4],
+        "idf": [1.0, 1.2, 1.5],
+        "vocabulary": {"ign": 0, "gno": 1, "nor": 2},
+    }
+    json_file = tmp_path / "tiny_detector.json"
+    json_file.write_text(json.dumps(data), encoding="utf-8")
+    return json_file
+
+
+def test_detector_load_from_json(tiny_json_model_path: Path) -> None:
+    """Verifica carregamento seguro a partir de JSON sem emissão de UserWarning de pickle."""
+    with warnings.catch_warnings(record=True) as recorded_warnings:
+        warnings.simplefilter("always")
+        detector = PromptInjectionDetector.load(tiny_json_model_path)
+
+    # Não deve emitir warnings de pickle/RCE
+    user_warnings = [w for w in recorded_warnings if issubclass(w.category, UserWarning)]
+    assert len(user_warnings) == 0
+
+    assert detector.threshold == 0.65
+    assert len(detector.model_version) == 12
+
+    res = detector.predict("How to bake bread?")
+    assert isinstance(res, DetectionResult)
+    assert 0.0 <= res.score <= 1.0
+    assert res.threshold == 0.65
+

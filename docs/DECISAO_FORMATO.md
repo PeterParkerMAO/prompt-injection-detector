@@ -1,6 +1,6 @@
 # Decisão de Formato de Serialização do Artefato
 
-> **Status:** Proposta técnica elaborada para avaliação. **Nenhuma substituição do `joblib` foi realizada**, aguardando aprovação explícita antes de qualquer alteração no formato de persistência.
+> **Status:** Aprovado e implementado (Opção C: pesos puros em JSON). O carregamento padrão em `src/pid/detector.py` utiliza o formato JSON (`outputs/hybrid_stacked_char_lr.json`), mantendo o joblib legado apenas para fins de reprodutibilidade/pesquisa com aviso explícito de segurança.
 
 ---
 
@@ -56,3 +56,4 @@ Recomenda-se a **Opção C (Parâmetros em JSON Puro / Safetensors)** para a pr�
 3. Garante auditabilidade completa dos pesos em repositórios de segurança.
 
 > **Aviso de Transição:** Enquanto não houver aprovação explícita do mantenedor para a migração para JSON/Safetensors, o artefato permanece em `joblib`, protegido pela validação de integridade por hash SHA-256 e pelo aviso explícito de segurança na API.
+
