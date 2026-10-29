@@ -44,6 +44,22 @@ uv run python -m pid.finetune --model microsoft/deberta-v3-small --epochs 3 --lr
 uv run python -m pid.finetune --model protectai/deberta-v3-base-prompt-injection-v2 --eval-only
 ```
 
+### Reproduce each model
+
+Setup: `uv sync --extra hf` for the classical models, plus `--extra finetune` for transformers (GPU
+recommended for training; latency is always measured on CPU). **Order matters:** `pid.cli` writes a fresh
+`reports/metrics.json`, and each `pid.finetune` run appends its rows to it, so run `pid.cli` first.
+
+| Model (row in the results table) | Command |
+| --- | --- |
+| `rules`, `tfidf_lr` | `uv run python -m pid.cli --config configs/default.yaml` |
+| `rules`, `tfidf_lr`, plus `char_wb_tfidf_lr`, `char_wb_tfidf_lr_windowed`, `word_char_svm`, `hybrid_stacked_char_lr` (the n=30 threshold recalibration is computed for these four) | `uv run python -m pid.cli --config configs/default.yaml --extra-baselines` |
+| `finetune:distilbert-base-uncased` (seed 42, 43, 44) | `uv run python -m pid.finetune --model distilbert-base-uncased --epochs 3 --lr 2e-5 --seed <seed>` |
+| `finetune:distilbert-base-multilingual-cased` (seed 42, 43, 44) | `uv run python -m pid.finetune --model distilbert-base-multilingual-cased --epochs 3 --lr 2e-5 --seed <seed>` |
+| `finetune:all-MiniLM-L6-v2` (FP32) and `:int8` | `uv run python -m pid.finetune --model sentence-transformers/all-MiniLM-L6-v2 --epochs 3 --lr 2e-5 --seed 42 --quantize-int8` |
+| `finetune:microsoft/deberta-v3-small` | `uv run python -m pid.finetune --model microsoft/deberta-v3-small --epochs 3 --lr 2e-5 --batch-size 16 --seed 42` |
+| `pretrained:protectai/deberta-v3-base-prompt-injection-v2` (no training) | `uv run python -m pid.finetune --model protectai/deberta-v3-base-prompt-injection-v2 --eval-only` |
+
 ## Results (from `reports/metrics.json`, `target_recall = 0.95` on validation)
 
 | Model | Threshold (`thr`) | Same-base F1 (95% CI) | Other-base F1 (95% CI) | ROC-AUC (Same / Other) | CPU p95 (ms) | Size (MB) |
