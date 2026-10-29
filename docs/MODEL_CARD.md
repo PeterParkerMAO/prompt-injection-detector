@@ -41,13 +41,13 @@ Cleaning: exact-duplicate removal (`111` removed from `xTRam1`), conflicting-lab
 
 CPU latency (single text): p50 `265.6` ms, p95 `496.9` ms. Size: `567.6` MB.
 
-### Best Compact Fine-tune (`sentence-transformers/all-MiniLM-L6-v2`, `seed 42`, `threshold = 0.9951`)
-| Set | Precision | Recall | F1 (95% CI) | ROC-AUC |
-| --- | --- | --- | --- | --- |
-| Same base (`xTRam1` test, `n = 1,217`) | 1.000 | 0.937 | 0.968 (0.954–0.979) | 1.000 (0.9992–1.0000) |
-| Other base (`deepset`, `n = 546`) | 1.000 | 0.084 | 0.155 (0.091–0.219) | 0.657 |
+### Best Compact Fine-tune (`sentence-transformers/all-MiniLM-L6-v2`, `seed 42`, FP32 vs. Dynamic INT8)
+| Variant | Same-base F1 (95% CI) | Other-base F1 (95% CI) | Same / Other ROC-AUC | CPU p50 / p95 (ms) | Size (MB) |
+| --- | --- | --- | --- | --- | --- |
+| FP32 (`thr = 0.9951`) | 0.968 (0.954–0.979) | 0.155 (0.091–0.219) | 1.000 / 0.657 | 78.6 / 145.5 | 90.9 |
+| **Dynamic INT8 (`thr = 0.9943`)** | 0.956 (0.941–0.971) | 0.112 (0.057–0.174) | 1.000 / 0.650 | **12.0 / 17.8** | **34.77** |
 
-CPU latency (single text): p50 `78.6` ms, p95 `145.5` ms. Size: `90.9` MB.
+Dynamic INT8 quantization compresses `all-MiniLM-L6-v2` by **61.8%** (`90.9 MB → 34.77 MB`) and speeds up CPU p95 latency by **8.2x** (`145.45 ms → 17.77 ms`), bringing a Transformer inside the `≤ 50 ms` / `≤ 150 MB` server pod SLA.
 
 ### Best Multilingual Fine-tune (`distilbert-base-multilingual-cased`, `seed 43`, `threshold = 0.9982`)
 | Set | Precision | Recall | F1 (95% CI) | ROC-AUC |
@@ -71,11 +71,12 @@ CPU latency (single text): p50 `63.3` ms, p95 `169.9` ms. Size: `267.8` MB.
 | `rules` (`thr = 0.500`) | 0.359 | 0.308 | 0.609 / 0.591 | 0.03 / **0.28** | — |
 | `tfidf_lr` (`thr = 0.480`) | 0.954 (0.939–0.969) | 0.129 (0.070–0.194) | 0.999 / 0.755 | 0.33 / 0.62 | 5.58 |
 | `char_wb_tfidf_lr` (`thr = 0.452`) | 0.963 (0.948–0.976) | 0.112 (0.058–0.174) | 0.999 / 0.832 | 1.11 / 5.11 | **2.06** |
-| `char_wb_tfidf_lr_windowed` (`thr = 0.452`) | 0.962 (0.947–0.975) | 0.145 (0.086–0.210)* | 0.997 / **0.882** | 1.34 / 10.74 | **2.06** |
+| `char_wb_tfidf_lr_windowed` (`thr = 0.452`) | 0.962 (0.947–0.975) | 0.145 (0.086–0.210)* | 0.997 / 0.882 | 1.34 / 10.74 | **2.06** |
+| `hybrid_stacked_char_lr` (`thr = 0.723`) | **0.973** (0.960–0.985) | **0.343** (0.266–0.418)* | 0.997 / **0.902** | 1.70 / 6.33 | 2.78 |
 | `word_char_svm` (`thr = 0.941`) | 0.965 (0.951–0.977) | 0.075 (0.029–0.127) | 1.000 / 0.795 | 3.47 / 6.33 | 4.58 |
 | `pretrained:protectai/deberta-v3-base-prompt-injection-v2` (`thr = 0.0002`) | 0.947 (0.929–0.962) | **0.756** (0.703–0.807) | 0.995 / 0.879 | 525.5 / 826.1 | 737.7 |
 
-*\*Recalibrating only the threshold on `n = 30` target-domain samples (evaluated out-of-sample on the remaining 516 rows) raises external F1 to `0.672` (`char_wb_tfidf_lr`) and `0.729` (`char_wb_tfidf_lr_windowed`).*
+*\*Recalibrating only the threshold on `n = 30` target-domain samples (evaluated out-of-sample on the remaining 516 rows) raises external F1 to `0.672` (`char_wb_tfidf_lr`), `0.729` (`char_wb_tfidf_lr_windowed`), and **`0.740`** (`hybrid_stacked_char_lr`, `95% CI: 0.632–0.789`).*
 
 ## Limitations and risks
 - **What the model misses (from error analysis):**

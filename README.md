@@ -33,13 +33,13 @@ uv run python -m pid.cli --synthetic # end-to-end demo; numbers are NOT results
 uv sync --extra hf
 uv run python -m pid.cli --config configs/default.yaml --extra-baselines
 
-# 2. Fine-tuning transformers (GPU recommended) and evaluating public off-the-shelf detector
+# 2. Fine-tuning transformers (GPU recommended), INT8 quantization, and public off-the-shelf detector
 uv sync --extra hf --extra finetune
 for s in 42 43 44; do
   uv run python -m pid.finetune --model distilbert-base-uncased --epochs 3 --lr 2e-5 --seed $s
   uv run python -m pid.finetune --model distilbert-base-multilingual-cased --epochs 3 --lr 2e-5 --seed $s
 done
-uv run python -m pid.finetune --model sentence-transformers/all-MiniLM-L6-v2 --epochs 3 --lr 2e-5 --seed 42
+uv run python -m pid.finetune --model sentence-transformers/all-MiniLM-L6-v2 --epochs 3 --lr 2e-5 --seed 42 --quantize-int8
 uv run python -m pid.finetune --model microsoft/deberta-v3-small --epochs 3 --lr 2e-5 --batch-size 16 --seed 42
 uv run python -m pid.finetune --model protectai/deberta-v3-base-prompt-injection-v2 --eval-only
 ```
@@ -51,19 +51,21 @@ uv run python -m pid.finetune --model protectai/deberta-v3-base-prompt-injection
 | `rules` (Regex) | 0.5000 | 0.359 (—) | 0.308 (—) | 0.609 / 0.591 | **0.28** | — |
 | `tfidf_lr` (Word 1–2) | 0.4798 | 0.954 (0.939–0.969) | 0.129 (0.070–0.194) | 0.999 / 0.755 | 0.62 | 5.58 |
 | `char_wb_tfidf_lr` (Char 3–5) | 0.4516 | 0.963 (0.948–0.976) | 0.112 (0.058–0.174) | 0.999 / 0.832 | 5.11 | **2.06** |
-| `char_wb_tfidf_lr_windowed` (Sentence Max-Pool) | 0.4516 | 0.962 (0.947–0.975) | 0.145 (0.086–0.210)* | 0.997 / **0.882** | 10.74 | **2.06** |
+| `char_wb_tfidf_lr_windowed` (Sentence Max-Pool) | 0.4516 | 0.962 (0.947–0.975) | 0.145 (0.086–0.210)* | 0.997 / 0.882 | 10.74 | **2.06** |
+| `hybrid_stacked_char_lr` (Stacked Aug + Hybrid)* | 0.7230 | **0.973** (0.960–0.985) | **0.343** (0.266–0.418)* | 0.997 / **0.902** | 6.33 | 2.78 |
 | `word_char_svm` (LinearSVC cal.) | 0.9415 | 0.965 (0.951–0.977) | 0.075 (0.029–0.127) | 1.000 / 0.795 | 6.33 | 4.58 |
-| `finetune:all-MiniLM-L6-v2` (`seed 42`) | 0.9951 | 0.968 (0.954–0.979) | 0.155 (0.091–0.219) | 1.000 / 0.657 | 145.45 | 90.9 |
+| `finetune:all-MiniLM-L6-v2` (`seed 42`, FP32) | 0.9951 | 0.968 (0.954–0.979) | 0.155 (0.091–0.219) | 1.000 / 0.657 | 145.45 | 90.9 |
+| `finetune:all-MiniLM-L6-v2:int8` (`seed 42`, INT8) | 0.9943 | 0.956 (0.941–0.971) | 0.112 (0.057–0.174) | 1.000 / 0.650 | **17.77** | **34.77** |
 | `finetune:distilbert-base-uncased` (`seed 42`) | 0.9988 | 0.968 (0.954–0.980) | 0.067 (0.021–0.119) | **1.000** / 0.704 | 169.86 | 267.8 |
 | `finetune:distilbert-base-uncased` (`seed 43`) | 0.9982 | 0.959 (0.943–0.972) | 0.057 (0.019–0.105) | **1.000** / 0.721 | 260.72 | 267.8 |
 | `finetune:distilbert-base-uncased` (`seed 44`) | 0.9984 | 0.957 (0.942–0.971) | 0.039 (0.009–0.081) | **1.000** / 0.667 | 125.51 | 267.8 |
 | `finetune:distilbert-base-multilingual-cased` (`seed 42`) | 0.9990 | 0.960 (0.946–0.973) | 0.076 (0.029–0.131) | 1.000 / 0.654 | 280.53 | 541.3 |
-| `finetune:distilbert-base-multilingual-cased` (`seed 43`) | 0.9982 | **0.969** (0.955–0.981) | 0.085 (0.038–0.139) | 1.000 / 0.645 | 248.32 | 541.3 |
+| `finetune:distilbert-base-multilingual-cased` (`seed 43`) | 0.9982 | 0.969 (0.955–0.981) | 0.085 (0.038–0.139) | 1.000 / 0.645 | 248.32 | 541.3 |
 | `finetune:distilbert-base-multilingual-cased` (`seed 44`) | 0.9982 | 0.966 (0.953–0.978) | 0.076 (0.030–0.129) | 1.000 / 0.612 | 192.99 | 541.3 |
-| `finetune:microsoft/deberta-v3-small` (`seed 42`) | 0.9999 | 0.968 (0.955–0.979) | **0.188** (0.117–0.260) | **1.000** / 0.823 | 496.92 | 567.6 |
+| `finetune:microsoft/deberta-v3-small` (`seed 42`) | 0.9999 | 0.968 (0.955–0.979) | 0.188 (0.117–0.260) | **1.000** / 0.823 | 496.92 | 567.6 |
 | `pretrained:protectai/deberta-v3-base-prompt-injection-v2` *(off-the-shelf)* | 0.0002 | 0.947 (0.929–0.962) | **0.756** (0.703–0.807) | 0.995 / 0.879 | 826.07 | 737.7 |
 
-*\*With 30-sample few-shot threshold recalibration on the target domain (evaluated out-of-sample on the remaining 516 external rows), `char_wb_tfidf_lr` reaches external **F1 = 0.672** and `char_wb_tfidf_lr_windowed` reaches **F1 = 0.729** (`95% CI: 0.597–0.766`, recall `0.754`, precision `0.732`) without retraining any weights.*
+*\*With 30-sample few-shot threshold recalibration on the target domain (evaluated out-of-sample on the remaining 516 external rows), `char_wb_tfidf_lr` reaches external **F1 = 0.672**, `char_wb_tfidf_lr_windowed` reaches **F1 = 0.729**, and `hybrid_stacked_char_lr` reaches **F1 = 0.740** (`95% CI: 0.632–0.789`) without retraining any weights. Even without threshold recalibration, `hybrid_stacked_char_lr` achieves external **F1 = 0.343** (`ROC-AUC = 0.902`), surpassing `rules` (`0.308`) and `tfidf_lr` (`0.129`) at `6.33 ms` CPU p95 and `2.78 MB`.*
 
 ### Benchmark Visualizations
 
