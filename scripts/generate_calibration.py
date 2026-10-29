@@ -9,6 +9,7 @@ from pathlib import Path
 
 import joblib
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -157,10 +158,10 @@ def main() -> None:
 
     # Painel 1: Diagrama de Confiabilidade
     ax1.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfeitamente Calibrado")
-    
+
     val_pts = [(b["confidence"], b["accuracy"]) for b in cal_test["bins"] if b["count"] > 0]
     ext_pts = [(b["confidence"], b["accuracy"]) for b in cal_ext["bins"] if b["count"] > 0]
-    
+
     if val_pts:
         vx, vy = zip(*val_pts, strict=True)
         ax1.plot(vx, vy, marker="o", color="#2563eb", linewidth=1.5, label=f"Mesma Base (ECE={cal_test['ece']:.3f})")

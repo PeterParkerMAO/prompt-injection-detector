@@ -1,9 +1,10 @@
-.PHONY: test lint demo run
-test:
-	uv run pytest -q
+.PHONY: check test lint
+
+check:
+	@uv run python scripts/run_check.py
+
 lint:
-	uv run ruff check .
-demo:
-	uv run python -m pid.cli --synthetic --out /tmp/pid-demo
-run:
-	uv run python -m pid.cli --config configs/default.yaml
+	@uv run ruff check .
+
+test:
+	@uv run pytest -q

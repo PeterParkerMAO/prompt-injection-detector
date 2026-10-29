@@ -18,8 +18,8 @@ os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 import json
-from pathlib import Path
 import time
+from pathlib import Path
 
 import numpy as np
 import psutil
