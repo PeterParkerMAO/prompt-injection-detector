@@ -30,7 +30,9 @@ Escreva as decisões ANTES de ver os resultados quando a pergunta disser "antes"
 - **Qual recall alvo você escolheu e por quê?**
   - **0,95 na validação.** Obriga a capturar 95% dos ataques conhecidos sem jogar o limiar para zero por causa de poucos exemplos difíceis. Testamos também 0,90 e 0,99 para ver a troca com a precisão.
 - **Que valor de latência (p95, CPU) e de tamanho tornaria o modelo utilizável no Ícarus?**
-  - **Latência p95 em CPU ≤ 50 ms** (para rodar antes da chamada ao LLM sem travar a resposta) e **tamanho de 100 a 150 MB no máximo**. Como o pod do servidor tem limite total de **512 MiB de RAM**, qualquer modelo acima de 150 MB aperta a memória do processo Python e da API; modelos de 268 MB ou 541 MB não cabem.
+  - **Latência p95 em CPU ≤ 50 ms** (para rodar antes da chamada ao LLM sem travar a resposta).
+  - **Tamanho — resposta original: ≤ 550 MB** (commit `3adc0de`, pensando em "um container CPU padrão").
+  - **Tamanho — teto revisado: ≤ 150 MB de modelo em disco** (revisão de 2026-10-28, depois de conferir onde o detector vai rodar). O backend do Ícarus roda num pod com **limite de 512 MiB** e já usa **~106 MB em regime e ~170 MB de pico** num login (o Argon2id aloca 64 MiB por hash; medidas do próprio Ícarus). Sobram uns **340 MiB** no pior momento, e eles precisam caber não só os pesos, mas o runtime de inferência, a tokenização e as ativações, que somam memória além do tamanho do arquivo. Um modelo de até 150 MB deixa essa folga; os de 268 MB (DistilBERT) e 541 MB (DistilBERT multilíngue) não cabem, e o teto original de 550 MB **sozinho já passava do pod inteiro**, por isso não podia ficar.
 - **Qual critério decide entre os modelos? (e registro do desvio após ver os resultados)**
   - **Critério inicial (como foi escrito antes dos resultados, commit `3adc0de`):** maior F1 na base externa (`deepset`), desde que cumpra **p95 ≤ 50 ms em CPU** e **tamanho ≤ 550 MB**, e que supere o `tfidf_lr` em pelo menos **+0,03 de F1 externo**.
   - **Desvio do critério:**
