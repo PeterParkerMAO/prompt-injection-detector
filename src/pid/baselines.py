@@ -98,3 +98,36 @@ def train_word_char_svm(texts: list[str], labels: list[int], seed: int = 42, C: 
     ])
     model.fit(texts, labels)
     return model
+
+
+def augment_stacked_prompts(texts: list[str], labels: list[int], n_aug: int = 1200,
+                            seed: int = 42) -> tuple[list[str], list[int]]:
+    """Sintetiza stacked prompts concatenando textos benignos com ataques do treino."""
+    benign = [t for t, y in zip(texts, labels, strict=True) if y == 0]
+    attacks = [t for t, y in zip(texts, labels, strict=True) if y == 1]
+    if not benign or not attacks or n_aug <= 0:
+        return list(texts), list(labels)
+    rng = np.random.default_rng(seed)
+    b_idx = rng.integers(0, len(benign), n_aug)
+    a_idx = rng.integers(0, len(attacks), n_aug)
+    seps = (" ", "\n", "\n\n", " --- ")
+    aug_x = [
+        f"{benign[bi]}{seps[i % len(seps)]}{attacks[ai]}"
+        for i, (bi, ai) in enumerate(zip(b_idx, a_idx, strict=True))
+    ]
+    return [*texts, *aug_x], [*labels, *([1] * n_aug)]
+
+
+def train_hybrid_stacked_char_lr(texts: list[str], labels: list[int], seed: int = 42,
+                                 n_aug: int = 1200, min_df: int = 2) -> Pipeline:
+    aug_x, aug_y = augment_stacked_prompts(texts, labels, n_aug=n_aug, seed=seed)
+    return train_char_tfidf_lr(aug_x, aug_y, seed=seed, min_df=min_df)
+
+
+def hybrid_stacked_scores(model: Pipeline, texts: list[str]) -> np.ndarray:
+    """Ensemble híbrido: combina score por janela, score global e gatilho de regras."""
+    win_s = windowed_tfidf_scores(model, texts)
+    doc_s = tfidf_scores(model, texts)
+    rul_s = rules_score(texts)
+    base_s = 0.55 * win_s + 0.45 * doc_s
+    return np.where(rul_s >= RULES_THRESHOLD, np.maximum(base_s, 0.85 + 0.15 * rul_s), base_s)

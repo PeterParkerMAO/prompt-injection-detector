@@ -155,6 +155,32 @@ def run(config: dict | None, synthetic: bool, out_dir: str, extra_baselines: boo
                 }
                 report.add_model(metrics, w_entry)
 
+        n_aug = 120 if synthetic else 1200
+        hmodel = baselines.train_hybrid_stacked_char_lr(texts(train), labels(train), seed=seed, n_aug=n_aug)
+        hval = baselines.hybrid_stacked_scores(hmodel, texts(val))
+        hthr = evaluate.threshold_for_recall(labels(val), hval, target_recall)
+        htest = baselines.hybrid_stacked_scores(hmodel, texts(test))
+        hext = baselines.hybrid_stacked_scores(hmodel, texts(external))
+        h_entry = {
+            "name": "hybrid_stacked_char_lr",
+            "size_mb": round(len(pickle.dumps(hmodel)) / 1e6, 3),
+            "threshold": hthr,
+            "in_distribution": _score_block(labels(test), htest, hthr),
+            "in_distribution_ci95": {
+                "f1": list(evaluate.bootstrap_ci(labels(test), htest, hthr, "f1", seed=seed)),
+                "roc_auc": list(evaluate.bootstrap_ci(labels(test), htest, hthr, "roc_auc", seed=seed)),
+            },
+            "external": _score_block(labels(external), hext, hthr),
+            "external_ci95": {
+                "f1": list(evaluate.bootstrap_ci(labels(external), hext, hthr, "f1", seed=seed)),
+            },
+            "external_recalibrated_n30": evaluate.recalibrate_few_shot(
+                labels(external), hext, n_calib=30, target_recall=0.80, seed=seed),
+            "latency_ms_cpu": evaluate.measure_latency(
+                lambda t, m=hmodel: baselines.hybrid_stacked_scores(m, [t]), texts(test)),
+        }
+        report.add_model(metrics, h_entry)
+
     # --- erros para leitura manual (não versionar) ---
     report.write_errors(out / "errors_tfidf_in_distribution.csv", test, test_scores, thr, "in_distribution")
     report.write_errors(out / "errors_tfidf_external.csv", external, ext_scores, thr, "external")

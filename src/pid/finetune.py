@@ -12,6 +12,7 @@ Exemplo:
 from __future__ import annotations
 
 import argparse
+import io
 from pathlib import Path
 
 import numpy as np
@@ -29,7 +30,7 @@ def _softmax_positive(logits: np.ndarray) -> np.ndarray:
 
 def run(config_path: str, model_name: str, epochs: int, lr: float, batch_size: int,
         max_length: int, max_samples: int | None, seed: int | None, out_dir: str,
-        metrics_path: str, eval_only: bool = False) -> dict:
+        metrics_path: str, eval_only: bool = False, quantize_int8: bool = False) -> dict:
     import torch
     from torch.utils.data import Dataset
     from transformers import (
@@ -143,6 +144,49 @@ def run(config_path: str, model_name: str, epochs: int, lr: float, batch_size: i
     if metrics is None:
         metrics = report.new_metrics(seed, "real", target_recall)
     report.add_model(metrics, entry)
+    if quantize_int8:
+        qmodel = torch.ao.quantization.quantize_dynamic(
+            model, {torch.nn.Linear}, dtype=torch.qint8
+        ).eval()
+        compact_sd = {
+            k: (v.half() if isinstance(v, torch.Tensor) and v.dtype == torch.float32 else v)
+            for k, v in qmodel.state_dict().items()
+        }
+        buf = io.BytesIO()
+        torch.save(compact_sd, buf)
+
+        def q_batch(rows, bsz: int = 64):
+            texts = [s.text for s in rows]
+            outs = []
+            for i in range(0, len(texts), bsz):
+                enc = tok(texts[i : i + bsz], truncation=True, max_length=max_length,
+                          padding=True, return_tensors="pt")
+                with torch.no_grad():
+                    outs.append(qmodel(**enc).logits.numpy())
+            return _softmax_positive(np.vstack(outs))
+
+        qv, qt, qe = q_batch(val), q_batch(test), q_batch(external)
+        qthr = evaluate.threshold_for_recall(y_val, qv, target_recall)
+
+        def predict_one_q(text: str):
+            enc = tok(text, truncation=True, max_length=max_length, return_tensors="pt")
+            with torch.no_grad():
+                return qmodel(**enc).logits
+
+        q_entry = {
+            "name": f"finetune:{model_name}:int8:seed{seed}",
+            "size_mb": round(buf.tell() / 1e6, 2),
+            "threshold": qthr,
+            "in_distribution": evaluate.evaluate_at_threshold(y_test, qt, qthr),
+            "in_distribution_ci95": {
+                "f1": list(evaluate.bootstrap_ci(y_test, qt, qthr, "f1", seed=seed)),
+                "roc_auc": list(evaluate.bootstrap_ci(y_test, qt, qthr, "roc_auc", seed=seed)),
+            },
+            "external": evaluate.evaluate_at_threshold(y_ext, qe, qthr),
+            "external_ci95": {"f1": list(evaluate.bootstrap_ci(y_ext, qe, qthr, "f1", seed=seed))},
+            "latency_ms_cpu": evaluate.measure_latency(predict_one_q, [s.text for s in test], repeats=100),
+        }
+        report.add_model(metrics, q_entry)
     fig_dir = mpath.parent / "figures"
     fig_dir.mkdir(parents=True, exist_ok=True)
     if not eval_only:
@@ -167,11 +211,13 @@ def main() -> None:
     p.add_argument("--max-samples", type=int, default=None, help="teste de fumaça com poucas amostras")
     p.add_argument("--seed", type=int, default=None)
     p.add_argument("--eval-only", action="store_true", help="avalia detector pré-treinado sem treinar")
+    p.add_argument("--quantize-int8", action="store_true",
+                   help="aplica quantização dinâmica INT8 após o treino e mede tamanho/latência em CPU")
     p.add_argument("--out", default="outputs/finetune")
     p.add_argument("--metrics", default="reports/metrics.json")
     a = p.parse_args()
     entry = run(a.config, a.model, a.epochs, a.lr, a.batch_size, a.max_length, a.max_samples,
-                a.seed, a.out, a.metrics, eval_only=a.eval_only)
+                a.seed, a.out, a.metrics, eval_only=a.eval_only, quantize_int8=a.quantize_int8)
     print(f"{entry['name']}: mesma base F1={entry['in_distribution']['f1']:.3f}, "
           f"outra base F1={entry['external']['f1']:.3f}, p95={entry['latency_ms_cpu']['p95_ms']:.1f} ms")
 
