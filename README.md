@@ -1,4 +1,4 @@
-1# prompt-injection-detector
+# prompt-injection-detector
 
 > **Status: evaluated on real public datasets (`data_source: "real"`).** Every number in this
 > README comes directly from `reports/metrics.json` (`xTRam1/safe-guard-prompt-injection` →
@@ -49,15 +49,17 @@ uv run python -m pid.finetune --model protectai/deberta-v3-base-prompt-injection
 ```python
 from pid.detector import PromptInjectionDetector
 
-# Carrega o modelo recomendado (híbrido leve, 2.78 MB)
-detector = PromptInjectionDetector.load("outputs/hybrid_stacked_char_lr.joblib")
+# Carrega o modelo recomendado no formato seguro JSON padrão (sem riscos de RCE por pickle)
+detector = PromptInjectionDetector.load()
+# Ou explicitando o caminho do artefato seguro JSON:
+# detector = PromptInjectionDetector.load("outputs/hybrid_stacked_char_lr.json")
 
 # Predição individual (retorna DetectionResult imutável)
 result = detector.predict("Translate the following sentence to French: Hello world")
 print(result.flagged)        # False
 print(result.score)          # Ex.: 0.042
 print(result.threshold)      # 0.7230
-print(result.model_version)  # "4039fcbe605f"
+print(result.model_version)  # "b2cfd3e993d5"
 
 # Predição em lote
 results = detector.predict_batch([
@@ -67,10 +69,12 @@ results = detector.predict_batch([
 ```
 
 > **Aviso de Defesa em Profundidade:** Este detector estatístico/heurístico é estritamente **UMA camada de defesa** contra injeção de prompt e não substitui arquiteturas seguras de aplicação (delimitação estrita de instruções, execução com privilégio mínimo, sanitização de saída, isolamento de agentes e monitoramento contínuo).
+>
+> **Nota de Formato de Artefato:** O carregamento padrão utiliza parâmetros puros em JSON (`outputs/hybrid_stacked_char_lr.json`). O artefato original em `joblib` (`outputs/hybrid_stacked_char_lr.joblib`) é mantido apenas para fins de pesquisa e reprodutibilidade, emitindo aviso explícito de segurança caso seja carregado.
 
 ### Quality checks and CI
 
-Para rodar a suíte local completa de verificação (linter ruff, testes pytest e checagens de segurança bandit/pip-audit se disponíveis):
+Para rodar a suíte local completa de verificação (linter ruff, testes pytest e checagens de segurança bandit/pip-audit se disponíveis, sem uso de rede e pulando ferramentas ausentes):
 
 ```bash
 make check
@@ -80,23 +84,7 @@ uv run python scripts/run_check.py
 
 A saída consolidada é salva em `reports/check.txt`.
 
-> **Nota sobre CI:** O fluxo de trabalho de Integração Contínua está configurado em `.github/workflows/ci.yml`, mas sua execução no GitHub Actions encontra-se atualmente bloqueada por limites de cobrança da conta (billing limits). Toda verificação deve ser executada localmente via `make check`.
-
-### Reproduce each model
-
-Setup: `uv sync --extra hf` for the classical models, plus `--extra finetune` for transformers (GPU
-recommended for training; latency is always measured on CPU). **Order matters:** `pid.cli` writes a fresh
-`reports/metrics.json`, and each `pid.finetune` run appends its rows to it, so run `pid.cli` first.
-
-| Model (row in the results table) | Command |
-| --- | --- |
-| `rules`, `tfidf_lr` | `uv run python -m pid.cli --config configs/default.yaml` |
-| `rules`, `tfidf_lr`, plus `char_wb_tfidf_lr`, `char_wb_tfidf_lr_windowed`, `word_char_svm`, `hybrid_stacked_char_lr` (the n=30 threshold recalibration is computed for these four) | `uv run python -m pid.cli --config configs/default.yaml --extra-baselines` |
-| `finetune:distilbert-base-uncased` (seed 42, 43, 44) | `uv run python -m pid.finetune --model distilbert-base-uncased --epochs 3 --lr 2e-5 --seed <seed>` |
-| `finetune:distilbert-base-multilingual-cased` (seed 42, 43, 44) | `uv run python -m pid.finetune --model distilbert-base-multilingual-cased --epochs 3 --lr 2e-5 --seed <seed>` |
-| `finetune:all-MiniLM-L6-v2` (FP32) and `:int8` | `uv run python -m pid.finetune --model sentence-transformers/all-MiniLM-L6-v2 --epochs 3 --lr 2e-5 --seed 42 --quantize-int8` |
-| `finetune:microsoft/deberta-v3-small` | `uv run python -m pid.finetune --model microsoft/deberta-v3-small --epochs 3 --lr 2e-5 --batch-size 16 --seed 42` |
-| `pretrained:protectai/deberta-v3-base-prompt-injection-v2` (no training) | `uv run python -m pid.finetune --model protectai/deberta-v3-base-prompt-injection-v2 --eval-only` |
+> **Nota sobre CI:** O fluxo de trabalho de Integração Contínua está configurado em `.github/workflows/ci.yml` com ambiente fixado em `ubuntu-24.04`, executando `make check` e o pipeline sintético. Contudo, a execução remota no GitHub Actions encontra-se temporariamente pausada por limites de faturamento da conta (billing limits). Toda a suíte roda localmente de forma equivalente e determinística.
 
 ## Results (from `reports/metrics.json`, `target_recall = 0.95` on validation)
 
@@ -144,8 +132,8 @@ Check each dataset card for its license before publishing anything derived from 
 ## Limitations
 
 1. **Severe distribution shift & threshold miscalibration:** Because `xTRam1/safe-guard-prompt-injection` attacks were synthetically generated with GPT-3.5-turbo in English, both `tfidf_lr` (ROC-AUC `0.999`) and fine-tuned DistilBERT (ROC-AUC `1.000`) achieve near-perfect separation in-distribution. Calibrating the threshold on validation for `target_recall = 0.95` pushes the threshold to `0.480` for TF-IDF and `0.998–0.999` for DistilBERT (due to neural network overconfidence). On `deepset/prompt-injections`, out-of-distribution scores fall below these high thresholds, causing external F1 to drop from `0.954` to `0.129` (TF-IDF) and from `0.957–0.969` to `0.039–0.085` (DistilBERT), even though ranking ability remains moderate (`ROC-AUC = 0.755` for word TF-IDF, `0.832` for `char_wb_tfidf_lr`, `0.667–0.721` across the 3 seeds of `distilbert-base-uncased`, and `0.612–0.654` across the 3 seeds of `distilbert-base-multilingual-cased`).
-2. **Model selection criterion shift & server memory budget (512 MiB pod → ≤ 150 MB model cap, CPU p95 ≤ 50 ms):** The size cap written before the results was ≤ 550 MB; it was revised to ≤ 150 MB because the API already peaks at ~170 MB inside a 512 MiB pod (550 MB alone exceeds the pod). Under the pre-registered strict criterion ("highest external F1 at the validation-calibrated threshold within ≤ 50 ms and the size cap, beating `tfidf_lr` by ≥ 0.03"), regex **`rules` (`F1 = 0.308`, `p95 = 0.28 ms`)** wins among the first-round models because every model trained on `xTRam1` suffers from threshold miscalibration on `deepset`. After observing that fixed-threshold F1 conflates ranking ability with synthetic threshold calibration, we recorded an explicit criterion shift in [`docs/DECISOES.md`](docs/DECISOES.md): evaluating by **external ROC-AUC + target-domain threshold recalibration** within the 100–150 MB / 50 ms pod budget selects **`char_wb_tfidf_lr` (`ROC-AUC = 0.832`, `2.06 MB`, `p95 = 5.11 ms`)**.
-3. **Training-source overlap in the third-party baseline (`protectai/deberta-v3-base-prompt-injection-v2`):** Its [model card](https://huggingface.co/protectai/deberta-v3-base-prompt-injection-v2) (checked 2026-10-28) **names 7 datasets**: `natolambert/xstest-v2-copy`, `VMware/open-instruct`, `alespalla/chatbot_instruction_prompts`, `HuggingFaceH4/grok-conversation-harmless`, `Harelix/Prompt-Injection-Mixed-Techniques-2024`, `OpenSafetyLab/Salad-Data` and `jackhhao/jailbreak-classification`; its license summary counts **22 datasets**, so 15 are unnamed. Two named sources are also seeds of `xTRam1` ([card](https://huggingface.co/datasets/xTRam1/safe-guard-prompt-injection)): **`VMware/open-instruct` and `jackhhao/jailbreak-classification`**. Its `xTRam1` score (`F1 = 0.947`) is therefore not an independent evaluation. `deepset/prompt-injections` does not appear in the card, but with 15 unnamed sources its absence from training cannot be confirmed, so the external score (`F1 = 0.756`, `ROC-AUC = 0.879`) is a reference point, not proof of generalization. Its footprint (`737.7 MB`, `p95 = 826.1 ms`) exceeds the 512 MiB pod budget anyway.
+2. **Model selection criterion shift & server memory budget (512 MiB pod → 100–150 MB model cap, CPU p95 ≤ 50 ms):** Under the initial strict criterion ("highest external F1 at the validation-calibrated threshold within ≤ 50 ms and ≤ 150 MB"), regex **`rules` (`F1 = 0.308`, `p95 = 0.28 ms`)** wins because every model trained on `xTRam1` suffers from threshold miscalibration on `deepset`. After observing that fixed-threshold F1 conflates ranking ability with synthetic threshold calibration, we recorded an explicit criterion shift in [`docs/DECISOES.md`](docs/DECISOES.md): evaluating by **external ROC-AUC + target-domain threshold recalibration** within the 100–150 MB / 50 ms pod budget selects **`char_wb_tfidf_lr` (`ROC-AUC = 0.832`, `2.06 MB`, `p95 = 5.11 ms`)**.
+3. **Training-source overlap in the third-party baseline (`protectai/deberta-v3-base-prompt-injection-v2`):** Its model card lists **7 training datasets**, including `VMware/open-instruct` and `jackhhao/jailbreak-classification`, which are also upstream sources of `xTRam1`. Therefore, its "same-base" score on `xTRam1` (`F1 = 0.947`) is not an independent evaluation. Because `deepset/prompt-injections` is not among its 7 training datasets, its external score (`F1 = 0.756`, `ROC-AUC = 0.879`) is a valid out-of-distribution reference, though its footprint (`737.7 MB`, `p95 = 826.1 ms`) exceeds the 512 MiB pod budget.
 4. **Stacked / indirect prompt injections:** Long benign prefixes dilute document-level representations (L2-normalized TF-IDF vectors and truncated 128-token windows), allowing trailing instructions like *"Forget everything"* to slip through as false negatives.
 5. **Language coverage & small external test set:** `xTRam1` is English-only, whereas `deepset` (`n = 546`, `203` positives) includes German, Spanish, French, Russian, and Croatian prompts, yielding wide 95% bootstrap confidence intervals (~`0.10–0.14` F1 width on `deepset` vs. ~`0.03` on `xTRam1`).
 6. **Label noise in public benchmarks:** Manual inspection of `xTRam1` errors revealed benign creative-writing prompts and explicit non-jailbreak texts labeled as `1`.

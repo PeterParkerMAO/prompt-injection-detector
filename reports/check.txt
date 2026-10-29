@@ -1,59 +1,59 @@
 ===========================================================
-Verificação de Integridade e Qualidade (2026-10-29T16:12:24.440447+00:00)
+Verificação de Integridade e Qualidade (2026-10-29T17:53:26.408555+00:00)
 ===========================================================
 
 [RUFF] Status: PASSED
 All checks passed!
 --------------------------------------------------
 [PYTEST] Status: PASSED
-....................................                                     [100%]
+.....................................                                    [100%]
 ============================== warnings summary ===============================
 tests/test_detector.py::test_detector_load_and_predict_api
-  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:47: UserWarning: Security warning: Loading artifacts with joblib (pickle) can execute arbitrary code. Only load model artifacts from trusted sources.
+  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:49: UserWarning: Research artifact warning: Loading artifacts with joblib (pickle) is intended only for research/reproducibility and can execute arbitrary code. Only load model artifacts from trusted sources.
     detector = PromptInjectionDetector.load(tiny_model_path, threshold=0.5, scoring="hybrid")
 
 tests/test_detector.py::test_detector_predict_batch
-  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:65: UserWarning: Security warning: Loading artifacts with joblib (pickle) can execute arbitrary code. Only load model artifacts from trusted sources.
+  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:67: UserWarning: Research artifact warning: Loading artifacts with joblib (pickle) is intended only for research/reproducibility and can execute arbitrary code. Only load model artifacts from trusted sources.
     detector = PromptInjectionDetector.load(tiny_model_path, threshold=0.5, scoring="hybrid")
 
 tests/test_detector.py::test_validation_rejects_non_string
-  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:77: UserWarning: Security warning: Loading artifacts with joblib (pickle) can execute arbitrary code. Only load model artifacts from trusted sources.
+  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:79: UserWarning: Research artifact warning: Loading artifacts with joblib (pickle) is intended only for research/reproducibility and can execute arbitrary code. Only load model artifacts from trusted sources.
     detector = PromptInjectionDetector.load(tiny_model_path)
 
 tests/test_detector.py::test_validation_rejects_empty_and_whitespace
-  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:85: UserWarning: Security warning: Loading artifacts with joblib (pickle) can execute arbitrary code. Only load model artifacts from trusted sources.
+  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:87: UserWarning: Research artifact warning: Loading artifacts with joblib (pickle) is intended only for research/reproducibility and can execute arbitrary code. Only load model artifacts from trusted sources.
     detector = PromptInjectionDetector.load(tiny_model_path)
 
 tests/test_detector.py::test_validation_rejects_length_exceeded
-  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:93: UserWarning: Security warning: Loading artifacts with joblib (pickle) can execute arbitrary code. Only load model artifacts from trusted sources.
+  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:95: UserWarning: Research artifact warning: Loading artifacts with joblib (pickle) is intended only for research/reproducibility and can execute arbitrary code. Only load model artifacts from trusted sources.
     detector = PromptInjectionDetector.load(tiny_model_path)
 
 tests/test_detector.py::test_validation_rejects_invalid_batch_format
-  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:101: UserWarning: Security warning: Loading artifacts with joblib (pickle) can execute arbitrary code. Only load model artifacts from trusted sources.
+  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:103: UserWarning: Research artifact warning: Loading artifacts with joblib (pickle) is intended only for research/reproducibility and can execute arbitrary code. Only load model artifacts from trusted sources.
     detector = PromptInjectionDetector.load(tiny_model_path)
 
 tests/test_detector.py::test_detector_determinism
-  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:110: UserWarning: Security warning: Loading artifacts with joblib (pickle) can execute arbitrary code. Only load model artifacts from trusted sources.
+  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:112: UserWarning: Research artifact warning: Loading artifacts with joblib (pickle) is intended only for research/reproducibility and can execute arbitrary code. Only load model artifacts from trusted sources.
     detector = PromptInjectionDetector.load(tiny_model_path, threshold=0.5)
 
 tests/test_detector.py::test_detector_model_version_stability
-  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:122: UserWarning: Security warning: Loading artifacts with joblib (pickle) can execute arbitrary code. Only load model artifacts from trusted sources.
+  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:124: UserWarning: Research artifact warning: Loading artifacts with joblib (pickle) is intended only for research/reproducibility and can execute arbitrary code. Only load model artifacts from trusted sources.
     d1 = PromptInjectionDetector.load(tiny_model_path)
 
 tests/test_detector.py::test_detector_model_version_stability
-  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:123: UserWarning: Security warning: Loading artifacts with joblib (pickle) can execute arbitrary code. Only load model artifacts from trusted sources.
+  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:125: UserWarning: Research artifact warning: Loading artifacts with joblib (pickle) is intended only for research/reproducibility and can execute arbitrary code. Only load model artifacts from trusted sources.
     d2 = PromptInjectionDetector.load(tiny_model_path)
 
 tests/test_detector.py::test_no_input_text_leaks_in_logs
-  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:129: UserWarning: Security warning: Loading artifacts with joblib (pickle) can execute arbitrary code. Only load model artifacts from trusted sources.
+  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:131: UserWarning: Research artifact warning: Loading artifacts with joblib (pickle) is intended only for research/reproducibility and can execute arbitrary code. Only load model artifacts from trusted sources.
     detector = PromptInjectionDetector.load(tiny_model_path)
 
 tests/test_detector.py::test_thread_safety_under_concurrent_calls
-  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:144: UserWarning: Security warning: Loading artifacts with joblib (pickle) can execute arbitrary code. Only load model artifacts from trusted sources.
+  C:\Users\rely.junior\Downloads\prompt-injection-detector\tests\test_detector.py:146: UserWarning: Research artifact warning: Loading artifacts with joblib (pickle) is intended only for research/reproducibility and can execute arbitrary code. Only load model artifacts from trusted sources.
     detector = PromptInjectionDetector.load(tiny_model_path, threshold=0.5)
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-36 passed, 11 warnings in 12.87s
+37 passed, 11 warnings in 48.59s
 --------------------------------------------------
 [BANDIT] Não instalado no ambiente (ignorado)
 --------------------------------------------------
