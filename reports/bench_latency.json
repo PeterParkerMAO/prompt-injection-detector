@@ -1,0 +1,24 @@
+{
+  "model": "hybrid_stacked_char_lr",
+  "model_version": "4039fcbe605f",
+  "artifact_size_mb": 2.778,
+  "constraint": "1 thread (OMP_NUM_THREADS=1)",
+  "methodological_note": "Esta medição em thread única aproxima o isolamento de CPU de um pod conteinerizado de 512 MiB, mas não substitui a medição em ambiente real sob contenção de cgroup do Kubernetes.",
+  "benchmark": {
+    "n_repeats": 500,
+    "seed": 42,
+    "latency_ms": {
+      "p50_ms": 0.873,
+      "p95_ms": 1.363,
+      "p99_ms": 1.625,
+      "mean_ms": 0.933,
+      "std_ms": 0.212
+    },
+    "resident_memory_rss_mb": {
+      "before_model_load_mb": 154.37,
+      "after_model_load_mb": 172.02,
+      "model_overhead_mb": 17.65,
+      "peak_during_inference_mb": 172.5
+    }
+  }
+}
