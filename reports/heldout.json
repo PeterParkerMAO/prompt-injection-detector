@@ -1,0 +1,80 @@
+{
+  "dataset": "deepset/prompt-injections",
+  "split": "test",
+  "model": "hybrid_stacked_char_lr",
+  "weights_file": "outputs\\hybrid_stacked_char_lr.joblib",
+  "weights_size_mb": 2.778,
+  "n_samples": 116,
+  "class_distribution": {
+    "benign": 56,
+    "injection": 60
+  },
+  "cleaning": {
+    "duplicates_removed": 0,
+    "conflicting_removed": 0
+  },
+  "fixed_validation_threshold_evaluation": {
+    "threshold": 0.7230226800237757,
+    "f1": 0.23529411764705882,
+    "f1_ci95": [
+      0.0967741935483871,
+      0.3611111111111111
+    ],
+    "roc_auc": 0.8642857142857143,
+    "roc_auc_ci95": [
+      0.799694738472312,
+      0.9200443553351131
+    ],
+    "pr_auc": 0.8862861647289306,
+    "precision": 1.0,
+    "recall": 0.13333333333333333,
+    "fpr": 0.0,
+    "confusion": {
+      "tp": 8,
+      "fp": 0,
+      "tn": 56,
+      "fn": 52
+    }
+  },
+  "recalibration_n30": {
+    "description": "Com n=30 amostras sorteadas do domínio alvo, o limiar é definido como o maior valor tau que garante recall >= 0.80 sobre as injeções desse subconjunto de calibração. As métricas são avaliadas estritamente fora da amostra (out-of-sample) nos exemplos restantes. O procedimento é repetido 100 vezes com semente fixa (seed=42) para gerar a distribuição empírica.",
+    "n_calib": 30,
+    "target_recall": 0.8,
+    "n_trials_valid": 100,
+    "f1": {
+      "mean": 0.7495951290955536,
+      "std": 0.057532508330480236,
+      "p05": 0.6578947368421053,
+      "p50": 0.7528146742567996,
+      "p95": 0.8113207547169811
+    },
+    "recall": {
+      "mean": 0.7721546027171742,
+      "std": 0.13243260145482916,
+      "p05": 0.542900092506938,
+      "p50": 0.8048780487804879,
+      "p95": 0.9357178968655208
+    },
+    "precision": {
+      "mean": 0.7519250144001863,
+      "std": 0.06625425334122535,
+      "p05": 0.6603584905660377,
+      "p50": 0.7424633936261843,
+      "p95": 0.8611111111111112
+    },
+    "fpr": {
+      "mean": 0.28793953648144194,
+      "std": 0.11915778017588707,
+      "p05": 0.1155933214072749,
+      "p50": 0.2963759213759214,
+      "p95": 0.4651937984496124
+    },
+    "threshold": {
+      "mean": 0.07518302387094328,
+      "std": 0.019602908098208048,
+      "p05": 0.05645056967303862,
+      "p50": 0.06631605458359273,
+      "p95": 0.10004403030796641
+    }
+  }
+}
