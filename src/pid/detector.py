@@ -1,12 +1,12 @@
 """Componente reutilizável para inferência de detecção de prompt injection."""
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import logging
-from pathlib import Path
 import threading
 import warnings
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import joblib
