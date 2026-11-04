@@ -2,7 +2,7 @@
 language:
   - en
   - multilingual
-license: apache-2.0
+license: mit
 tags: [text-classification, prompt-injection, security]
 ---
 
@@ -95,7 +95,7 @@ The following models were trained and benchmarked to evaluate the trade-offs bet
 | `deepset/prompt-injections` (`train` split) | external dev / test (`546`) | `546` | Apache-2.0 |
 | `deepset/prompt-injections` (`test` split) | held-out validation (`116`) | `116` | Apache-2.0 |
 
-> **Note on `xTRam1` License:** The dataset `xTRam1/safe-guard-prompt-injection` does not provide an explicit open-source license on its Hugging Face dataset card. Therefore, raw prompt text from this dataset **must not be redistributed** in this repository. All models are trained locally and evaluated at runtime. The code and model artifacts in this repository are licensed under Apache-2.0.
+> **Note on `xTRam1` License:** The dataset `xTRam1/safe-guard-prompt-injection` does not provide an explicit open-source license on its Hugging Face dataset card. Therefore, raw prompt text from this dataset **must not be redistributed** in this repository. All models are trained locally and evaluated at runtime. The code and model artifacts in this repository are licensed under the MIT License (see [`LICENSE`](../LICENSE)); the datasets keep their own licenses and are not redistributed.
 
 ---
 
