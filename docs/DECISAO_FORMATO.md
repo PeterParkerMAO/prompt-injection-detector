@@ -55,5 +55,5 @@ Recomenda-se a **Opção C (Parâmetros em JSON Puro / Safetensors)** para a pr�
 2. Preserva a arquitetura híbrida de forma explícita no código (`src/pid/detector.py`);
 3. Garante auditabilidade completa dos pesos em repositórios de segurança.
 
-> **Aviso de Transição:** Enquanto não houver aprovação explícita do mantenedor para a migração para JSON/Safetensors, o artefato permanece em `joblib`, protegido pela validação de integridade por hash SHA-256 e pelo aviso explícito de segurança na API.
+> **Estado (atualizado em 2026-11-04):** a Opção C foi implementada no commit `2884bc6`. O artefato de produção é `outputs/hybrid_stacked_char_lr.json` (versão `b2cfd3e993d5`), carregado por padrão pelo `PromptInjectionDetector.load`; a equivalência com o `joblib` foi conferida em 3.101 textos com diferença máxima `0.0` (`reports/equivalencia.json`). O `joblib` fica só para reproduzir a pesquisa e **não** entra no pacote publicado no Hugging Face.
 

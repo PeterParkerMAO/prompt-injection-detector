@@ -19,24 +19,24 @@ The model bundle contains several files organized by operational role:
 
 | File / Directory | Description | Status |
 | :--- | :--- | :--- |
-| `hybrid_stacked_char_lr.joblib` | **Recommended Production Model:** Subword char n-grams (3–5) + Logistic Regression trained with synthetic stacked-prompt augmentation and evaluated with sentence max-pooling and regex rules. | **Production (Recommended)** |
-| `char_wb_tfidf_lr.joblib` | Pure subword char n-gram TF-IDF + Logistic Regression baseline without sentence pooling or rules. | Research Baseline |
-| `tfidf_lr.joblib` | Word 1–2 n-gram TF-IDF + Logistic Regression baseline. | Research Baseline |
-| `model_minilm_int8_fp16.pt` | Dynamically quantized INT8 checkpoint of `all-MiniLM-L6-v2` with FP16 embeddings (34.77 MB). | Production Transformer |
+| `hybrid_stacked_char_lr.json` | **Recommended Production Model** in a safe, non-executable format: vocabulary, IDF, logistic-regression coefficients, threshold and extraction parameters as plain JSON (7.33 MB). Loaded by default by `PromptInjectionDetector.load`. Numerically identical to the joblib artifact (max absolute difference `0.0` over 3,101 texts, `reports/equivalencia.json`). | **Production (Recommended)** |
+| `hybrid_stacked_char_lr.joblib` | Same model as the JSON above, serialized with pickle. Kept only to reproduce the research pipeline. | Research only (pickle) |
+| `char_wb_tfidf_lr.joblib` | Pure subword char n-gram TF-IDF + Logistic Regression baseline without sentence pooling or rules. | Research Baseline (pickle) |
+| `tfidf_lr.joblib` | Word 1–2 n-gram TF-IDF + Logistic Regression baseline. | Research Baseline (pickle) |
+| `model_minilm_int8_fp16.pt` | Dynamically quantized INT8 checkpoint of `all-MiniLM-L6-v2` with FP16 embeddings (34.77 MB). Saved with `torch.save` (pickle-based). | Research Transformer (pickle) |
 | `model.safetensors`, `config.json`, `tokenizer.json` | Fine-tuned `distilbert-base-uncased` checkpoint (seed 42, 267.8 MB). | Research Checkpoint |
 | `metrics.json` | Contract evaluation metrics for all 16 evaluated models across both datasets. | Evaluation Report |
 | `calibration.json` | Reliability diagram bins, Expected Calibration Error (ECE) and threshold sensitivity table. | Calibration Report |
 | `heldout.json` | Single-pass evaluation on the previously untouched `test` split of `deepset/prompt-injections`. | Validation Report |
 
-> **Security Warning (Pickle / Joblib Artifacts):** Artifacts ending in `.joblib` use Python pickle serialization. Loading pickle files from untrusted sources can execute arbitrary code. Only load model artifacts from verified repositories or compare the SHA-256 hash before loading.
+> **Security Warning (pickle artifacts):** `.joblib` and `.pt` files use Python pickle serialization; loading one from an untrusted source can execute arbitrary code. Use the JSON artifact in production. If you must load a pickle artifact, only do it from this repository and compare its SHA-256 first.
 
 ---
 
 ## Recommended Model: `hybrid_stacked_char_lr`
 
-- **Artifact:** `hybrid_stacked_char_lr.joblib`
-- **File Size:** `2.78 MB` (2,778,054 bytes)
-- **Model Version:** `4039fcbe605f` (SHA-256 short hash)
+- **Artifact:** `hybrid_stacked_char_lr.json` (safe JSON, `7.33 MB`, model version `b2cfd3e993d5`, SHA-256 short hash of the file)
+- **Research artifact:** `hybrid_stacked_char_lr.joblib` (`2.78 MB`, 2,778,054 bytes, version `4039fcbe605f`), same predictions
 - **Decision Threshold:** `0.7230` (calibrated on `xTRam1` validation split for `target_recall = 0.95`)
 - **Server Pod Fit:** Fits comfortably inside a 512 MiB RAM container (peak inference RSS: `172.5 MB`, CPU p95: `6.33 ms` in multi-thread / `1.36 ms` in single-thread).
 
@@ -49,6 +49,23 @@ The model bundle contains several files organized by operational role:
 | **Other Base (Recalibrated $n = 30$)** | ~0.0853 | 0.751 | 0.772 | **0.740** (0.632–0.789) | 0.902 | 0.846 | 6.33 ms |
 
 > **Methodological Note on External Generalization:** The external `deepset/prompt-injections` (`train` split) was inspected during the manual error analysis that informed the design of the hybrid model (specifically identifying stacked prompts and character-level dilution). Consequently, the external F1 (`0.343` / `0.740`) on that split is an optimistic estimate. To verify unbiased generalization, a single-pass evaluation was subsequently performed on the completely isolated `test` split of `deepset` ($n = 116$, zero leakage), yielding **ROC-AUC = `0.864`**, F1 at validation threshold = `0.235`, and F1 with $n = 30$ recalibration = `0.750` (see `reports/heldout.json`).
+
+### Recommended Use: Triage Signal, Not a Blocker
+
+Use the score to **flag** a message (log it, show it to a reviewer, add friction, tighten tool permissions for that
+turn), not to **reject** it on its own. On the isolated held-out split (`reports/heldout.json`, $n = 116$):
+
+| Operating point | Precision | Recall | False-positive rate |
+| :--- | :---: | :---: | :---: |
+| Validation threshold `0.7230` (no target data) | 1.000 | 0.133 | 0.000 |
+| Recalibrated with $n = 30$ target samples (mean of 100 draws) | 0.752 | 0.772 | **0.288** (p5–p95: 0.116–0.465) |
+
+- At the validation threshold the detector almost never flags a benign message, but it misses most attacks
+  outside its training distribution: a low score is **not** evidence of safety.
+- After recalibration it catches most attacks, but blocking on it would reject **more than 1 in 4 benign messages**
+  (mean FPR 0.288), which is unacceptable as a sole gate.
+- Calibration degrades outside the training distribution (ECE `0.079` same base vs `0.212` external,
+  `reports/calibration.json`), so read the score as a ranking, not as a probability.
 
 ---
 
